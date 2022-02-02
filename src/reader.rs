@@ -37,7 +37,7 @@ impl Reader {
             eprintln!("{} must be a file", file.display());
             exit(2)
         }
-        let file: File = File::open(file).expect("Unable to open file");
+        let file: File = File::open(file).expect(&format!("Unable to open file {}", file.display())[..]);
         return self.read(file);
     }
 
@@ -51,23 +51,38 @@ impl Reader {
 
     fn read<T: Read>(&mut self, inner: T) -> &mut Self {
         let reader = BufReader::new(inner);
-        let end = if self.args.show_ends { "$" } else { "" };
+        let mut end = if self.args.show_ends { "$\n" } else { "\n" }.to_owned();
         let tab = if self.args.show_tabs { "^I" } else { "\t" };
-        for line in reader.lines() {
-            let line: String = line.expect("Unable to read line").replace("\t", tab);
-            let line = if self.args.show_non_printing { self.show_non_printable(line.as_bytes()) } else { line };
-            if self.args.squeeze_blank && self.last_line == line && line == "" { continue; }
-            self.last_line = line;
+        let mut lines = reader.lines();
+        let mut line = lines.next();
+        let mut new_line = true;
+        loop {
+            if matches!(line, Option::None) { return self; }
+            let next = lines.next();
+            if matches!(next, Option::None) {
+                new_line = false;
+                end.pop();
+            }
+            let line_str: String = line.unwrap().expect("Unable to read line").replace("\t", tab);
+            let line_str = if self.args.show_non_printing { self.show_non_printable(line_str.as_bytes()) } else { line_str };
+            if self.args.squeeze_blank && self.last_line == line_str && line_str.is_empty() {
+                line = next;
+                continue;
+            }
+            self.last_line = line_str;
             if self.args.number_lines {
-                if self.args.number_non_blank && self.last_line == "" {
-                    println!("{:>6}  {}{}", "", self.last_line, end);
-                    continue;
-                }
-                println!("{:>6}\t{}{}", self.counter, self.last_line, end);
-                self.counter += 1;
-            } else { println!("{}{}", self.last_line, end) }
+                self.print_numbered(self.args.number_non_blank && self.last_line.is_empty(), &end[..]);
+            } else { print!("{}{}", self.last_line, end) }
+            if !new_line { break }
+            line = next;
         }
-        return self;
+        return self
+    }
+
+    fn print_numbered(&mut self, skip: bool, end: &str) {
+        if skip { return print!("{}", end); }
+        print!("{:>6}\t{}{}", self.counter, self.last_line, end);
+        self.counter += 1;
     }
 
     fn show_non_printable(&self, line: &[u8]) -> String {

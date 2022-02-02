@@ -9,7 +9,7 @@ use crate::reader::Reader;
 
 fn main() {
     let reader = &mut Reader::new(args::CrabArgs::parse());
-    let (reader, files) = reader.get_files();
+    let files = reader.get_files();
     if files.is_empty() {
         reader.read_stdin();
     }

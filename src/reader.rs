@@ -28,7 +28,7 @@ impl Reader {
         }
     }
 
-    pub fn read_file(&mut self, file: &PathBuf) -> &mut Self {
+    pub fn read_file(&mut self, file: &PathBuf)  {
         if !file.exists() {
             eprintln!("{} must exist", file.display());
             exit(1)
@@ -37,51 +37,49 @@ impl Reader {
             eprintln!("{} must be a file", file.display());
             exit(2)
         }
-        let file: File = File::open(file).expect(&format!("Unable to open file {}", file.display())[..]);
-        return self.read(file);
+        match File::open(file)  {
+            Ok(file) => {self.read(file)}
+            Err(err) => {
+                eprintln!("Unable to open file {}: {}", file.display(), err.to_string());
+                exit(err.raw_os_error().unwrap_or(4))
+            }
+        }
     }
 
-    pub fn read_stdin(&mut self) -> &mut Self {
+    pub fn read_stdin(&mut self)  {
         if atty::isnt(Stream::Stdin) {
             let stdin: Stdin = io::stdin();
-            return self.read(stdin.lock());
+            self.read(stdin.lock());
         }
-        return self;
     }
 
-    fn read<T: Read>(&mut self, inner: T) -> &mut Self {
-        let reader = BufReader::new(inner);
-        let mut end = if self.args.show_ends { "$\n" } else { "\n" }.to_owned();
+    fn read<T: Read>(&mut self, inner: T)  {
+        let mut reader = BufReader::new(inner);
+        let end = if self.args.show_ends { "$" } else { "" };
         let tab = if self.args.show_tabs { "^I" } else { "\t" };
-        let mut lines = reader.lines();
-        let mut line = lines.next();
-        let mut new_line = true;
         loop {
-            if matches!(line, Option::None) { return self; }
-            let next = lines.next();
-            if matches!(next, Option::None) {
-                new_line = false;
-                end.pop();
+            let mut line = String::new();
+            match reader.read_line(&mut line) {
+                Ok(0) => { return }
+                Ok(_n) => {}
+                Err(err) => {
+                    eprintln!("Unable to read line: {}", err.to_string());
+                    exit(err.raw_os_error().unwrap_or(3))
+                }
             }
-            let line_str: String = line.unwrap().expect("Unable to read line").replace("\t", tab);
-            let line_str = if self.args.show_non_printing { self.show_non_printable(line_str.as_bytes()) } else { line_str };
-            if self.args.squeeze_blank && self.last_line == line_str && line_str.is_empty() {
-                line = next;
-                continue;
-            }
-            self.last_line = line_str;
+            let line: String = line.replace("\t", tab);
+            let line: String = if self.args.show_non_printing { self.show_non_printable(line.as_bytes()) } else { line };
+            if self.args.squeeze_blank && self.last_line == line && line.is_empty() {continue;}
+            self.last_line = line.replace("\n", format!("{}\n", end).as_str());
             if self.args.number_lines {
-                self.print_numbered(self.args.number_non_blank && self.last_line.is_empty(), &end[..]);
-            } else { print!("{}{}", self.last_line, end) }
-            if !new_line { break }
-            line = next;
+                self.print_numbered(self.args.number_non_blank && self.last_line.is_empty());
+            } else { print!("{}", self.last_line) }
         }
-        return self
     }
 
-    fn print_numbered(&mut self, skip: bool, end: &str) {
-        if skip { return print!("{}", end); }
-        print!("{:>6}\t{}{}", self.counter, self.last_line, end);
+    fn print_numbered(&mut self, skip: bool) {
+        if skip { return print!("{}",self.last_line); }
+        print!("{:>6}\t{}", self.counter, self.last_line);
         self.counter += 1;
     }
 
@@ -97,12 +95,12 @@ impl Reader {
         return result;
     }
 
-    pub fn get_files(&mut self) -> (&mut Self, Vec<PathBuf>) {
+    pub fn get_files(&mut self) -> Vec<PathBuf> {
         let mut files = Vec::new();
         for file in &self.args.files {
             files.push(PathBuf::from(file))
         }
-        (self, files)
+        files
     }
 }
 

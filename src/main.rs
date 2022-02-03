@@ -1,10 +1,8 @@
 mod args;
-mod mapping;
 mod reader;
 
 use clap::Parser;
 use crate::args::CrabArgs;
-use crate::mapping::char_mapping;
 use crate::reader::Reader;
 
 fn main() {

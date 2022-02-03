@@ -5,6 +5,8 @@ use std::io::{BufRead, BufReader, Read, Stdin};
 use std::path::PathBuf;
 use std::process::exit;
 use atty::Stream;
+use clap::lazy_static::lazy_static;
+use regex::Regex;
 use crate::{char_mapping, CrabArgs};
 
 pub struct Reader {
@@ -28,7 +30,7 @@ impl Reader {
         }
     }
 
-    pub fn read_file(&mut self, file: &PathBuf)  {
+    pub fn read_file(&mut self, file: &PathBuf) {
         if !file.exists() {
             eprintln!("{} must exist", file.display());
             exit(1)
@@ -37,8 +39,8 @@ impl Reader {
             eprintln!("{} must be a file", file.display());
             exit(2)
         }
-        match File::open(file)  {
-            Ok(file) => {self.read(file)}
+        match File::open(file) {
+            Ok(file) => { self.read(file) }
             Err(err) => {
                 eprintln!("Unable to open file {}: {}", file.display(), err.to_string());
                 exit(err.raw_os_error().unwrap_or(4))
@@ -46,45 +48,47 @@ impl Reader {
         }
     }
 
-    pub fn read_stdin(&mut self)  {
+    pub fn read_stdin(&mut self) {
         if atty::isnt(Stream::Stdin) {
             let stdin: Stdin = io::stdin();
             self.read(stdin.lock());
         }
     }
 
-    fn read<T: Read>(&mut self, inner: T)  {
-        let mut reader = BufReader::new(inner);
-        let end = if self.args.show_ends { "$" } else { "" };
-        let tab = if self.args.show_tabs { "^I" } else { "\t" };
+    fn read<T: Read>(&mut self, inner: T) {
+        lazy_static! {static ref TAB: Regex = Regex::new("[\t]").unwrap();}
+        lazy_static! {static ref NEW_LINE: Regex = Regex::new("[\n]").unwrap(); }
+        let mut reader: BufReader<T> = BufReader::new(inner);
         loop {
             let mut line = String::new();
+            let is_empty: bool;
             match reader.read_line(&mut line) {
-                Ok(0) => { return }
-                Ok(_n) => {}
+                Ok(0) => { return; }
+                Ok(n) => { is_empty = n <= 2 && (line == "\r\n" || line == "\n") }
                 Err(err) => {
                     eprintln!("Unable to read line: {}", err.to_string());
                     exit(err.raw_os_error().unwrap_or(3))
                 }
             }
-            let line: String = line.replace("\t", tab);
-            let line: String = if self.args.show_non_printing { self.show_non_printable(line.as_bytes()) } else { line };
-            if self.args.squeeze_blank && self.last_line == line && line.is_empty() {continue;}
-            self.last_line = line.replace("\n", format!("{}\n", end).as_str());
+            if self.args.show_tabs { line = TAB.replace_all("\t", "^I").into_owned(); }
+            if self.args.show_ends { line = NEW_LINE.replace_all("\n", "$\n").into_owned(); }
+            if self.args.show_non_printing { line = self.show_non_printable(line.as_bytes()) };
+            if self.args.squeeze_blank && self.last_line == line && is_empty { continue; }
+            self.last_line = line;
             if self.args.number_lines {
-                self.print_numbered(self.args.number_non_blank && self.last_line.is_empty());
+                self.print_numbered(self.args.number_non_blank && is_empty);
             } else { print!("{}", self.last_line) }
         }
     }
 
     fn print_numbered(&mut self, skip: bool) {
-        if skip { return print!("{}",self.last_line); }
+        if skip { return print!("{}", self.last_line); }
         print!("{:>6}\t{}", self.counter, self.last_line);
         self.counter += 1;
     }
 
     fn show_non_printable(&self, line: &[u8]) -> String {
-        let mut result = String::new();
+        let mut result = String::with_capacity(line.len());
         for char in line {
             if self.mapping.contains_key(&char) {
                 result.push_str(self.mapping.get(&char).unwrap())
@@ -96,11 +100,8 @@ impl Reader {
     }
 
     pub fn get_files(&mut self) -> Vec<PathBuf> {
-        let mut files = Vec::new();
-        for file in &self.args.files {
-            files.push(PathBuf::from(file))
-        }
+        let mut files = Vec::with_capacity(self.args.files.capacity());
+        for file in &self.args.files { files.push(PathBuf::from(file)) }
         files
     }
 }
-

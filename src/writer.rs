@@ -3,6 +3,7 @@ use std::io::Write;
 use crossbeam::{Receiver};
 use crate::CrabArgs;
 
+/// Structure in charge of processing the text and writing it to the standard output
 pub struct Writer {
     args: CrabArgs,
     counter: usize,
@@ -45,11 +46,9 @@ impl Writer {
         if self.args.squeeze_blank && self.last_line_empty && is_empty { return Ok(()); }
         self.last_line_empty = is_empty;
 
-        if self.args.number_lines {
-            if !(self.args.number_non_blank && is_empty) {
-                write!(buf, "{:>6}\t", self.counter)?;
-                self.counter += 1;
-            }
+        if self.args.number_lines && !(self.args.number_non_blank && is_empty) {
+            write!(buf, "{:>6}\t", self.counter)?;
+            self.counter += 1;
         }
 
         if self.args.show_non_printing {

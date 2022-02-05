@@ -1,12 +1,12 @@
 mod args;
 mod reader;
 mod writer;
+mod errors;
 
 use std::any::Any;
-use std::path::PathBuf;
 use std::thread;
 use clap::Parser;
-use crossbeam::unbounded;
+use crossbeam::{Receiver, Sender, unbounded};
 use crate::args::CrabArgs;
 use crate::reader::InputSource::{File, Stdin};
 use crate::reader::{InputSource, Reader};
@@ -15,19 +15,19 @@ use crate::writer::Writer;
 fn main() -> Result<(), Box<dyn Any + Send>> {
     let mut args = CrabArgs::parse();
     fix_args(&mut args);
-    let sources = get_sources(&args);
-    let (sender, receiver) = unbounded();
+    let sources: Vec<InputSource> = get_sources(&args);
+    let (sender, receiver): (Sender<Vec<u8>>, Receiver<Vec<u8>>) = unbounded();
     let mut reader = Reader::new(sender);
     let mut writer = Writer::new(args, receiver);
     let children = vec![
         thread::spawn(move || {
-        writer.write()
+            writer.write()
         }),
         thread::spawn(move || {
             for source in sources {
                 reader.read_source(source);
             }
-        })
+        }),
     ];
 
     for child in children {
@@ -37,11 +37,12 @@ fn main() -> Result<(), Box<dyn Any + Send>> {
 }
 
 fn get_sources(args: &CrabArgs) -> Vec<InputSource> {
-    let mut res = Vec::with_capacity(args.files.len());
+    if args.files.is_empty() { return vec![Stdin]; }
+    let mut res: Vec<InputSource> = Vec::with_capacity(args.files.len());
     for file in &args.files {
-        res.push(if file == "-" { Stdin } else { File(PathBuf::from(file)) })
+        res.push(if file == "-" { Stdin } else { File(file.to_string()) })
     }
-    return res;
+    res
 }
 
 fn fix_args(args: &mut CrabArgs) {

@@ -1,13 +1,16 @@
+use io::stdin;
 use std::fs::{File};
 use std::io;
-use std::io::{BufRead, BufReader, Read, Stdin};
+use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
-use std::process::exit;
 use atty::Stream;
 use crossbeam::{Sender};
+use CrabError::OpenError;
+use crate::errors::CrabError;
+use crate::errors::CrabError::ReadError;
 
 pub enum InputSource {
-    File(PathBuf),
+    File(String),
     Stdin,
 }
 
@@ -18,57 +21,33 @@ pub struct Reader {
 impl Reader {
     pub fn new(sender: Sender<Vec<u8>>) -> Self { Reader { sender } }
 
-    fn read_file(&mut self, path: &PathBuf) {
-        if !path.exists() {
-            eprintln!("{} must exist", path.display());
-            exit(1)
-        }
-        if !path.is_file() {
-            eprintln!("{} must be a file", path.display());
-            exit(2)
-        }
+    fn open_file(_path: String) -> File {
+        let path: PathBuf = PathBuf::from(&_path);
         match File::open(path) {
-            Ok(file) => {
-                self.read(file)
-            }
-            Err(err) => {
-                eprintln!("Unable to open file {}: {}", path.display(), err.to_string());
-                exit(err.raw_os_error().unwrap_or(4))
-            }
+            Ok(file) => { file }
+            Err(err) => { OpenError(_path, err).show_and_exit() }
         }
     }
 
-    fn read_stdin(&mut self) {
-        if atty::isnt(Stream::Stdin) {
-            let stdin: Stdin = io::stdin();
-            self.read(stdin.lock())
-        }
-    }
 
     pub fn read_source(&mut self, source: InputSource) {
-        match source {
-            InputSource::File(file) => { self.read_file(&file) }
-            InputSource::Stdin => { self.read_stdin() }
+        match &source {
+            InputSource::File(file) => { self.read(Self::open_file(file.to_string()), source) }
+            InputSource::Stdin => { if atty::isnt(Stream::Stdin) { self.read(stdin().lock(), source) } }
         }
     }
 
-    fn read<T: Read>(&mut self, inner: T) {
+    fn read<T: Read>(&mut self, inner: T, source: InputSource) {
         let mut reader: BufReader<T> = BufReader::new(inner);
         loop {
             let mut line: Vec<u8> = Vec::new();
-            let result = reader.read_until(b'\n', &mut line);
+            let result: std::io::Result<usize> = reader.read_until(b'\n', &mut line);
             match result {
                 Ok(0) => { return; }
                 Ok(_n) => {}
-                Err(err) => {
-                    eprintln!("Unable to read line: {}", err.to_string());
-                    exit(err.raw_os_error().unwrap_or(3))
-                }
+                Err(err) => { ReadError(source, err).show_and_exit() }
             }
-            match self.sender.send(line) {
-                Ok(_) => {}
-                Err(_) => { return; }
-            }
+            if self.sender.send(line).is_err() { return; }
         }
     }
 }

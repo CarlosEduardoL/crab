@@ -9,3 +9,4 @@ edition = "2021"
 clap = { version = "3.0.13", features = ["derive"] }
 atty = "0.2"
 regex = "1"
+crossbeam = "0.7"

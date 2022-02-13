@@ -97,3 +97,18 @@ fn stdin_in_the_middle() {
         vec![AllTheBytes, Pipe, AllTheBytes],
     );
 }
+#[cfg(unix)]
+#[test]
+fn fail_but_print() {
+    let (mut crab, cat_res) = compare_with_cat(
+        Some(AllTheBytes),
+        vec!["-b"],
+        vec![NoPermissions, Pipe, Random],
+    );
+    crab.assert()
+        .failure()
+        .stdout(predicate::eq(cat_res.stdout.as_slice()))
+        .stderr(predicate::str::contains(
+            " test_inputs/no_permission.txt: Permission denied",
+        ));
+}

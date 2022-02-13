@@ -1,9 +1,11 @@
+use lazy_static::lazy_static;
 use rand::seq::SliceRandom;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Mutex;
 
 pub enum TestFile {
     Random,
@@ -15,7 +17,7 @@ pub enum TestFile {
 impl TestFile {
     const _RANDOM: &'static str = "test_inputs/random.txt";
     const _ALL_THE_BYTES: &'static str = "test_inputs/all_the_bytes.txt";
-    const _NO_PERMISSIONS: &'static str = "test_inputs/no_permision.txt";
+    const _NO_PERMISSIONS: &'static str = "test_inputs/no_permission.txt";
 
     fn get_path(&self) -> PathBuf {
         match self {
@@ -57,6 +59,11 @@ impl TestFile {
         }
     }
     pub fn get(&self) -> &'static str {
+        lazy_static! {
+            static ref MUT: Mutex<()> = Mutex::new(());
+        };
+        let _guard = MUT.lock().unwrap();
+        let _ = std::fs::create_dir(PathBuf::from("test_inputs"));
         if let TestFile::Pipe = self {
             return "-";
         }

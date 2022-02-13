@@ -9,6 +9,7 @@ use std::io::{BufRead, BufReader, BufWriter, Error, Read, Stdout, StdoutLock, Wr
 use std::path::PathBuf;
 use CrabError::OpenError;
 
+#[derive(Clone)]
 pub enum InputSource {
     File(String),
     Stdin,
@@ -29,23 +30,33 @@ impl Reader {
         }
     }
 
-    fn open_file(_path: String) -> File {
+    fn open_file(_path: String) -> Option<File> {
         let path: PathBuf = PathBuf::from(&_path);
         match File::open(path) {
-            Ok(file) => file,
-            Err(err) => OpenError(_path, err).show_and_exit(),
+            Ok(file) => Some(file),
+            Err(err) => {
+                OpenError(_path, err).show();
+                None
+            }
         }
     }
 
-    pub fn read_source(&mut self, source: InputSource) {
+    pub fn read_source(&mut self, source: InputSource) -> u8 {
         match &source {
-            InputSource::File(file) => self.read(Self::open_file(file.to_string()), source),
+            InputSource::File(file) => {
+                if let Some(_file) = Self::open_file(file.to_string()) {
+                    self.read(_file, source);
+                } else {
+                    return 1;
+                }
+            }
             InputSource::Stdin => {
                 if atty::isnt(Stream::Stdin) {
                     self.read(stdin().lock(), source)
                 }
             }
         }
+        0
     }
 
     fn read<T: Read>(&mut self, inner: T, source: InputSource) {
@@ -61,7 +72,10 @@ impl Reader {
                     return;
                 }
                 Ok(_n) => {}
-                Err(err) => ReadError(source, err).show_and_exit(),
+                Err(err) => {
+                    ReadError(source, err).show();
+                    return;
+                }
             }
             if self.on_line(line, &mut buf).is_err() {
                 return;

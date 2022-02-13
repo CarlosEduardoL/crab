@@ -72,6 +72,7 @@ fn random_plus_random() {
 fn random_plus_random_stdin() {
     std_eq(Some(Random), vec![], vec![Random]);
 }
+#[cfg(unix)]
 #[test]
 fn fail_on_read() {
     let (mut crab, _) = crab_cat();

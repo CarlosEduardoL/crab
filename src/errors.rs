@@ -1,15 +1,15 @@
+use crate::errors::CrabError::ReadError;
+use crate::InputSource;
 use std::env::current_exe;
 use std::io::Error;
 use std::path::PathBuf;
 use std::process::exit;
 use CrabError::OpenError;
-use crate::errors::CrabError::ReadError;
-use crate::InputSource;
 
 /// Errors that Crab can handle
 pub enum CrabError {
     OpenError(String, Error),
-    ReadError(InputSource, Error)
+    ReadError(InputSource, Error),
 }
 
 impl CrabError {
@@ -21,7 +21,7 @@ impl CrabError {
             ReadError(source, err) => {
                 let name: String = match source {
                     InputSource::File(file) => format!("file {}", file),
-                    InputSource::Stdin => String::from("Stdin")
+                    InputSource::Stdin => String::from("Stdin"),
                 };
                 (format!("Error reading {}: {}", name, err), 2)
             }

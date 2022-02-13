@@ -1,5 +1,5 @@
 use crate::test::files::TestFile;
-use crate::test::files::TestFile::{AllTheBytes, NoPermissions, Random};
+use crate::test::files::TestFile::{AllTheBytes, NoPermissions, Pipe, Random};
 use predicates::prelude::predicate;
 use std::fs::File;
 use std::path::PathBuf;
@@ -88,4 +88,12 @@ fn all_bytes_show_non_printing() {
 #[test]
 fn all_bytes_show_all() {
     std_eq(None, vec!["-A"], vec![AllTheBytes]);
+}
+#[test]
+fn stdin_in_the_middle() {
+    std_eq(
+        Some(Random),
+        vec!["-A"],
+        vec![AllTheBytes, Pipe, AllTheBytes],
+    );
 }

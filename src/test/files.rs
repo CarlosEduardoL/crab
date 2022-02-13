@@ -9,6 +9,7 @@ pub enum TestFile {
     Random,
     AllTheBytes,
     NoPermissions,
+    Pipe,
 }
 
 impl TestFile {
@@ -21,6 +22,7 @@ impl TestFile {
             TestFile::Random => PathBuf::from(TestFile::_RANDOM),
             TestFile::AllTheBytes => PathBuf::from(TestFile::_ALL_THE_BYTES),
             TestFile::NoPermissions => PathBuf::from(TestFile::_NO_PERMISSIONS),
+            TestFile::Pipe => panic!("This will never happen"),
         }
     }
     fn create(&self) {
@@ -51,9 +53,13 @@ impl TestFile {
                     .wait()
                     .expect("Fail changing permission");
             }
+            _ => {}
         }
     }
     pub fn get(&self) -> &'static str {
+        if let TestFile::Pipe = self {
+            return "-";
+        }
         let path = self.get_path();
         if !path.exists() {
             self.create()
@@ -62,12 +68,13 @@ impl TestFile {
             TestFile::Random => TestFile::_RANDOM,
             TestFile::AllTheBytes => TestFile::_ALL_THE_BYTES,
             TestFile::NoPermissions => TestFile::_NO_PERMISSIONS,
+            _ => "-",
         }
     }
 }
 
 impl AsRef<OsStr> for TestFile {
     fn as_ref(&self) -> &OsStr {
-        &OsStr::new(self.get())
+        OsStr::new(self.get())
     }
 }

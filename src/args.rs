@@ -2,7 +2,7 @@ use clap::Parser;
 
 #[derive(Parser)]
 #[clap(name = "crab 🦀")]
-#[clap(version = "v0.1.0")]
+#[clap(version)]
 #[clap(author = "CarlosEduardoL")]
 #[clap(about = "Rust cat copy", long_about = None)]
 struct CrabArgs {

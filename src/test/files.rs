@@ -35,7 +35,7 @@ impl TestFile {
                 let mut chars: Vec<u8> = (33u8..=0x7E).collect::<Vec<u8>>();
                 chars.append(&mut vec![9, 10]);
                 let mut rng = rand::thread_rng();
-                for _ in 0..=10_000_000 {
+                for _ in 0..=i32::MAX {
                     write!(writer, "{}", *chars.choose(&mut rng).unwrap() as char).unwrap();
                 }
             }

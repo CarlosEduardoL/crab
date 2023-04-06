@@ -1,4 +1,4 @@
-use crate::args::Args;
+use crate::args::ARGS;
 use crate::errors::CrabError;
 use crate::errors::CrabError::ReadError;
 use atty::Stream;
@@ -8,6 +8,7 @@ use std::io;
 use std::io::{BufRead, BufReader, BufWriter, Error, Read, Stdout, StdoutLock, Write};
 use std::path::PathBuf;
 use CrabError::OpenError;
+use crate::mapping::{new_line, tab};
 
 #[derive(Clone)]
 pub enum InputSource {
@@ -16,15 +17,13 @@ pub enum InputSource {
 }
 
 pub struct Reader {
-    args: Args,
     counter: usize,
     last_line_empty: bool,
 }
 
 impl Reader {
-    pub fn new(args: Args) -> Self {
+    pub fn new() -> Self {
         Reader {
-            args,
             counter: 1,
             last_line_empty: false,
         }
@@ -61,12 +60,12 @@ impl Reader {
 
     fn read<T: Read>(&mut self, inner: T, source: InputSource) {
         let mut reader: BufReader<T> = BufReader::new(inner);
-        let stdout: Stdout = std::io::stdout();
+        let stdout: Stdout = io::stdout();
         let locked: StdoutLock = stdout.lock();
         let mut buf: BufWriter<StdoutLock> = BufWriter::new(locked);
         loop {
             let mut line: Vec<u8> = Vec::new();
-            let result: std::io::Result<usize> = reader.read_until(b'\n', &mut line);
+            let result: io::Result<usize> = reader.read_until(b'\n', &mut line);
             match result {
                 Ok(0) => {
                     return;
@@ -84,52 +83,32 @@ impl Reader {
     }
 
     fn on_line(&mut self, data: Vec<u8>, buf: &mut BufWriter<StdoutLock>) -> Result<(), Error> {
-        let tab = if self.args.show_tabs {
-            &b"^I"[..]
-        } else {
-            &b"\t"[..]
-        };
-        let new_line = if self.args.show_ends {
-            &[b'$', b'\n'][..]
-        } else {
-            &[b'\n'][..]
-        };
-        
         let is_empty = match data.as_slice() {
             b"\r\n" | b"\n" | b"\r" => true,
             _ => false,
         };
 
-        if self.args.squeeze_blank && self.last_line_empty && is_empty {
+        if ARGS.squeeze_blank && self.last_line_empty && is_empty {
             return Ok(());
         }
         self.last_line_empty = is_empty;
 
-        if self.args.number_lines && !(self.args.number_non_blank && is_empty) {
+        if ARGS.number_lines && !(ARGS.number_non_blank && is_empty) {
             write!(buf, "{:>6}\t", self.counter)?;
             self.counter += 1;
         }
-        if self.args.show_non_printing {
-            for c in data {
-                match c {
-                    0..=8 | 11..=31 => buf.write_all(&[b'^', (c + 64)])?,
-                    127 => buf.write_all(b"^?")?,
-                    128..=159 => buf.write_all(&[b'M', b'-', b'^', c - 128 + 64])?,
-                    160..=254 => buf.write_all(&[b'M', b'-', c - 160 + 32])?,
-                    255 => buf.write_all(b"M-^?")?,
-                    b'\t' => buf.write_all(tab)?,
-                    b'\n' => buf.write_all(new_line)?,
-                    _ => buf.write_all(&[c])?,
-                }
-            }
-        } else {
-            for c in data {
-                match c {
-                    b'\t' => buf.write_all(tab)?,
-                    b'\n' => buf.write_all(new_line)?,
-                    _ => buf.write_all(&[c])?,
-                }
-            }
+        for c in data {
+            match c {
+                b'\t' => buf.write_all(tab()),
+                b'\n' => buf.write_all(new_line()),
+                _ if !ARGS.show_non_printing => buf.write_all(&[c]),
+                0..=8 | 11..=31 => buf.write_all(&[b'^', (c + 64)]),
+                127 => buf.write_all(b"^?"),
+                128..=159 => buf.write_all(&[b'M', b'-', b'^', c - 128 + 64]),
+                160..=254 => buf.write_all(&[b'M', b'-', c - 160 + 32]),
+                255 => buf.write_all(b"M-^?"),
+                _ => buf.write_all(&[c])
+            }?
         }
         Ok(())
     }

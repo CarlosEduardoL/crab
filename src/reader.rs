@@ -85,55 +85,52 @@ impl Reader {
 
     fn on_line(&mut self, data: Vec<u8>, buf: &mut BufWriter<StdoutLock>) -> Result<(), Error> {
         let tab = if self.args.show_tabs {
-            &[b'^', b'I'][..]
+            &b"^I"[..]
         } else {
-            &[b'\t'][..]
+            &b"\t"[..]
         };
         let new_line = if self.args.show_ends {
             &[b'$', b'\n'][..]
         } else {
             &[b'\n'][..]
         };
-        let is_empty = data.len() <= 2
-            && (data[..] == [b'\r', b'\n'][..] || data[0] == b'\n' || data[0] == b'\r');
+        
+        let is_empty = match data.as_slice() {
+            b"\r\n" | b"\n" | b"\r" => true,
+            _ => false,
+        };
 
         if self.args.squeeze_blank && self.last_line_empty && is_empty {
             return Ok(());
         }
         self.last_line_empty = is_empty;
 
-        let mut buffer: Vec<u8> = Vec::with_capacity(if self.args.show_non_printing {
-            1024 * 1024
-        } else {
-            data.len()
-        });
         if self.args.number_lines && !(self.args.number_non_blank && is_empty) {
-            write!(buffer, "{:>6}\t", self.counter)?;
+            write!(buf, "{:>6}\t", self.counter)?;
             self.counter += 1;
         }
         if self.args.show_non_printing {
             for c in data {
                 match c {
-                    0..=8 | 11..=31 => buffer.write_all(&[b'^', (c + 64)])?,
-                    127 => buffer.write_all(b"^?")?,
-                    128..=159 => buffer.write_all(&[b'M', b'-', b'^', c - 128 + 64])?,
-                    160..=254 => buffer.write_all(&[b'M', b'-', c - 160 + 32])?,
-                    255 => buffer.write_all(b"M-^?")?,
-                    b'\t' => buffer.write_all(tab)?,
-                    b'\n' => buffer.write_all(new_line)?,
-                    _ => buffer.write_all(&[c])?,
+                    0..=8 | 11..=31 => buf.write_all(&[b'^', (c + 64)])?,
+                    127 => buf.write_all(b"^?")?,
+                    128..=159 => buf.write_all(&[b'M', b'-', b'^', c - 128 + 64])?,
+                    160..=254 => buf.write_all(&[b'M', b'-', c - 160 + 32])?,
+                    255 => buf.write_all(b"M-^?")?,
+                    b'\t' => buf.write_all(tab)?,
+                    b'\n' => buf.write_all(new_line)?,
+                    _ => buf.write_all(&[c])?,
                 }
             }
         } else {
             for c in data {
                 match c {
-                    b'\t' => buffer.write_all(tab)?,
-                    b'\n' => buffer.write_all(new_line)?,
-                    _ => buffer.write_all(&[c])?,
+                    b'\t' => buf.write_all(tab)?,
+                    b'\n' => buf.write_all(new_line)?,
+                    _ => buf.write_all(&[c])?,
                 }
             }
         }
-        buf.write_all(buffer.as_slice())?;
         Ok(())
     }
 }

@@ -1,4 +1,5 @@
 use clap::Parser;
+use lazy_static::lazy_static;
 
 #[derive(Parser)]
 #[clap(name = "crab 🦀")]
@@ -38,30 +39,35 @@ struct CrabArgs {
     show_non_printing: bool,
 }
 
-pub struct Args {
-    pub show_non_printing: bool,
-    pub show_ends: bool,
-    pub show_tabs: bool,
-    pub number_lines: bool,
-    pub squeeze_blank: bool,
-    pub number_non_blank: bool,
-}
+lazy_static! {
+    pub static ref ARGS: Args = {
+        let mut args = CrabArgs::parse();
+        args.show_non_printing |= args.ev || args.show_all || args.t;
+        args.show_ends |= args.ev || args.show_all;
+        args.show_tabs |= args.show_all || args.t;
+        args.number_lines |= args.number_non_blank;
 
-pub fn args() -> (Vec<String>, Args) {
-    let mut args = CrabArgs::parse();
-    args.show_non_printing |= args.ev || args.show_all || args.t;
-    args.show_ends |= args.ev || args.show_all;
-    args.show_tabs |= args.show_all || args.t;
-    args.number_lines |= args.number_non_blank;
-    (
-        args.files,
         Args {
+            files: args.files,
             show_non_printing: args.show_non_printing,
             show_ends: args.show_ends,
             show_tabs: args.show_tabs,
             number_lines: args.number_lines,
             squeeze_blank: args.squeeze_blank,
             number_non_blank: args.number_non_blank,
-        },
-    )
+        }
+    };
+}
+
+/// Struct to encapsulate a concise version
+/// Of the CLI Arguments after merge the options
+/// that enable or disable the same things
+pub struct Args {
+    pub files: Vec<String>,
+    pub show_non_printing: bool,
+    pub show_ends: bool,
+    pub show_tabs: bool,
+    pub number_lines: bool,
+    pub squeeze_blank: bool,
+    pub number_non_blank: bool,
 }

@@ -34,16 +34,6 @@ The returned byte slice is either a visible newline character or a regular newli
 depending on the value of the ARGS.show_ends boolean value.
 ## Returns
 A reference to a static byte slice representing a newline character.
-```
-use crate::mappings::new_line;
-let regular_new_line = b"\n";
-let visible_new_line = b"$\n";
-// When show_ends is true, new_line() returns a visible newline character
-assert_eq!(new_line(), visible_new_line);
-// When show_ends is false, new_line() returns a regular newline character
-ARGS.show_ends = false;
-assert_eq!(new_line(), regular_new_line);
-```
  */
 pub fn new_line() -> &'static [u8] {
     const NEW_LINE: &[u8; 1] = b"\n";

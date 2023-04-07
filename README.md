@@ -1,5 +1,6 @@
 # Crab 🦀 (Rust powered cat copy)
 
+
 Crab is a simple project that recreates the cat command in Rust. It uses exactly the same flags and arguments as cat, making it easy to use as a drop-in replacement.
 
 ## Building
